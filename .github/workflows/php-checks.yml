@@ -14,3 +14,7 @@ jobs:
         run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Test handlers
         run: python3 -m unittest discover -s tests -v
+      - name: Install isolated browser test dependencies
+        run: npm ci --prefix tests --ignore-scripts
+      - name: Test browser vendor compatibility
+        run: npm test --prefix tests
