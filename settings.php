@@ -2105,6 +2105,9 @@ function argon_update_option_checkbox($name){
 	}
 }
 function argon_update_themeoptions(){
+	if (!current_user_can('manage_options')){
+		return;
+	}
 	if (!isset($_POST['update_themeoptions'])){
 		return;
 	}

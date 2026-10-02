@@ -1,0 +1,7 @@
+{
+  "name": "argon-theme-regression-tests",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": { "test": "node --test vendor.test.cjs" },
+  "devDependencies": { "jsdom": "26.1.0" }
+}

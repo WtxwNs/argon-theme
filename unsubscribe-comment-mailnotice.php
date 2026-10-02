@@ -38,7 +38,7 @@
 	<link href="<?php bloginfo('template_url'); ?>/assets/vendor/font-awesome/css/font-awesome.min.css" rel="stylesheet">
 	<link type="text/css" href="<?php bloginfo('template_url'); ?>/assets/css/argon.min.css" rel="stylesheet">
 	<script src="<?php bloginfo('template_url'); ?>/assets/vendor/jquery/jquery.min.js"></script>
-	<script src="<?php bloginfo('template_url'); ?>/assets/vendor/bootstrap/bootstrap.min.js"></script>
+	<script src="<?php bloginfo('template_url'); ?>/assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 	<script src="<?php bloginfo('template_url'); ?>/assets/js/argon.min.js"></script>
 	<title><?php echo $page_title; ?></title>
 </head>
