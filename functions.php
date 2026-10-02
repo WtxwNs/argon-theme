@@ -876,6 +876,13 @@ function get_comment_parent_info($comment){
 }
 //是否可以查看评论编辑记录
 function can_visit_comment_edit_history($id){
+	$comment = get_comment($id);
+	if (!$comment || !user_can_view_comment($id)){
+		return false;
+	}
+	if ($comment -> comment_approved != '1' && !current_user_can('moderate_comments') && !check_comment_token($id) && !check_comment_userid($id)){
+		return false;
+	}
 	$who_can_visit_comment_edit_history = get_option("argon_who_can_visit_comment_edit_history");
 	if ($who_can_visit_comment_edit_history == ""){
 		$who_can_visit_comment_edit_history = "admin";
@@ -907,7 +914,7 @@ function get_comment_edit_history(){
 		)));
 	}
 	$editHistory = json_decode(get_comment_meta($id, "comment_edit_history", true));
-	$editHistory = array_reverse($editHistory);
+	$editHistory = is_array($editHistory) ? array_reverse($editHistory) : array();
 	$res = "";
 	$position = count($editHistory) + 1;
 	date_default_timezone_set(get_option('timezone_string'));
@@ -2190,11 +2197,11 @@ function argon_meta_box_1(){
 		<p style="margin-top: 15px;"><?php _e("单独控制该文章的过时信息显示。", 'argon');?></p>
 		<h4><?php _e("文末附加内容", 'argon');?></h4>
 		<?php $argon_after_post = get_post_meta($post->ID, "argon_after_post", true);?>
-		<textarea name="argon_after_post" id="argon_after_post" rows="3" cols="30" style="width:100%;"><?php if (!empty($argon_after_post)){echo $argon_after_post;} ?></textarea>
+		<textarea name="argon_after_post" id="argon_after_post" rows="3" cols="30" style="width:100%;"><?php if (!empty($argon_after_post)){echo esc_textarea($argon_after_post);} ?></textarea>
 		<p style="margin-top: 15px;"><?php _e("给该文章设置单独的文末附加内容，留空则跟随全局，设为 <code>--none--</code> 则不显示。", 'argon');?></p>
 		<h4><?php _e("自定义 CSS", 'argon');?></h4>
 		<?php $argon_custom_css = get_post_meta($post->ID, "argon_custom_css", true);?>
-		<textarea name="argon_custom_css" id="argon_custom_css" rows="5" cols="30" style="width:100%;"><?php if (!empty($argon_custom_css)){echo $argon_custom_css;} ?></textarea>
+		<textarea name="argon_custom_css" id="argon_custom_css" rows="5" cols="30" style="width:100%;"><?php if (!empty($argon_custom_css)){echo esc_textarea($argon_custom_css);} ?></textarea>
 		<p style="margin-top: 15px;"><?php _e("给该文章添加单独的 CSS", 'argon');?></p>
 
 		<script>$ = window.jQuery;</script>
@@ -2262,22 +2269,21 @@ function argon_save_meta_data($post_id){
 	if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE){
 		return $post_id;
 	}
-	if ($_POST['post_type'] == 'post'){
-		if (!current_user_can('edit_post', $post_id)){
-			return $post_id;
-		}
-	}
-	if ($_POST['post_type'] == 'page'){
-		if (!current_user_can('edit_page', $post_id)){
-			return $post_id;
-		}
+	if (!current_user_can('edit_post', $post_id)){
+		return $post_id;
 	}
 	update_post_meta($post_id, 'argon_hide_readingtime', $_POST['argon_meta_hide_readingtime']);
 	update_post_meta($post_id, 'argon_meta_simple', $_POST['argon_meta_simple']);
 	update_post_meta($post_id, 'argon_first_image_as_thumbnail', $_POST['argon_first_image_as_thumbnail']);
 	update_post_meta($post_id, 'argon_show_post_outdated_info', $_POST['argon_show_post_outdated_info']);
-	update_post_meta($post_id, 'argon_after_post', $_POST['argon_after_post']);
-	update_post_meta($post_id, 'argon_custom_css', $_POST['argon_custom_css']);
+	$after_post = isset($_POST['argon_after_post']) && is_string($_POST['argon_after_post']) ? wp_unslash($_POST['argon_after_post']) : '';
+	$custom_css = isset($_POST['argon_custom_css']) && is_string($_POST['argon_custom_css']) ? wp_unslash($_POST['argon_custom_css']) : '';
+	if (!current_user_can('unfiltered_html')){
+		$after_post = wp_kses_post($after_post);
+		$custom_css = wp_strip_all_tags($custom_css);
+	}
+	update_post_meta($post_id, 'argon_after_post', wp_slash($after_post));
+	update_post_meta($post_id, 'argon_custom_css', wp_slash($custom_css));
 }
 add_action('save_post', 'argon_save_meta_data');
 function update_post_meta_ajax(){
@@ -2289,9 +2295,16 @@ function update_post_meta_ajax(){
 		return;
 	}
 	header('Content-Type:application/json; charset=utf-8');
-	$post_id = intval($_POST["post_id"]);
-	$meta_key = $_POST["meta_key"];
-	$meta_value = $_POST["meta_value"];
+	$post_id = isset($_POST['post_id']) && is_scalar($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+	$meta_key = isset($_POST['meta_key']) && is_string($_POST['meta_key']) ? wp_unslash($_POST['meta_key']) : '';
+	$meta_value = isset($_POST['meta_value']) && is_string($_POST['meta_value']) ? wp_unslash($_POST['meta_value']) : '';
+	if (!$post_id || !current_user_can('edit_post', $post_id)){
+		wp_send_json(array('status' => 'failed'), 403);
+	}
+	// This endpoint is only used by the outdated-information selector.
+	if ($meta_key !== 'argon_show_post_outdated_info' || !in_array($meta_value, array('default', 'always', 'never'), true)){
+		wp_send_json(array('status' => 'failed'), 400);
+	}
 
 	if (get_post_meta($post_id, $meta_key, true) == $meta_value){
 		exit(json_encode(array(
@@ -2313,7 +2326,6 @@ function update_post_meta_ajax(){
 	}
 }
 add_action('wp_ajax_update_post_meta_ajax' , 'update_post_meta_ajax');
-add_action('wp_ajax_nopriv_update_post_meta_ajax' , 'update_post_meta_ajax');
 //首页显示说说
 function argon_home_add_post_type_shuoshuo($query){
 	if (is_home() && $query -> is_main_query()){
