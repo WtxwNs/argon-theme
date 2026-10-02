@@ -861,6 +861,7 @@ if (argonConfig.waterflow_columns != "1") {
 				dataType : "json",
 				data: {
 					action: "pin_comment",
+					nonce: argonConfig.comment_pin_nonce,
 					id: commentID,
 					pinned: pinned ? "false" : "true"
 				},

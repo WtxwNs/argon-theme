@@ -37,6 +37,8 @@ $post_exists = true; $post_status = 'publish'; $password_required = false;
 $visible = true; $owner = false; $history_access = 'everyone';
 function current_user_can($cap, $id = null) { global $capabilities; return in_array($cap . ($id === null ? '' : ':' . $id), $capabilities, true); }
 function wp_verify_nonce($nonce, $action) { return $nonce === 'valid'; }
+function check_ajax_referer($action, $key) { if (($_POST[$key] ?? '') !== 'valid') { echo json_encode(array('nonce_rejected' => true)); exit; } }
+function __($value, $domain) { return $value; }
 function absint($value) { return abs(intval($value)); }
 function wp_unslash($value) { return stripslashes($value); }
 function wp_slash($value) { return addslashes($value); }
@@ -112,6 +114,15 @@ class HandlerTests(unittest.TestCase):
             writes = self.run_php('argon_save_meta_data', body)
             after_post = next(row[2] for row in writes if row[1] == 'argon_after_post')
             self.assertEqual(after_post, data['argon_after_post'] if unrestricted else 'filtered:' + data['argon_after_post'])
+
+    def test_pin_requires_nonce_and_moderator(self):
+        for nonce in ('', 'invalid'):
+            body = '$_POST = array("nonce" => ' + json.dumps(nonce) + '); pin_comment();'
+            self.assertEqual(self.run_php('pin_comment', body), {'nonce_rejected': True})
+        result = self.run_php('pin_comment', '$_POST = array("nonce" => "valid"); pin_comment();')
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('nonce: argonConfig.comment_pin_nonce', (ROOT / 'argontheme.js').read_text())
+        self.assertIn("wp_create_nonce('argon_pin_comment')", (ROOT / 'header.php').read_text())
 
     def test_settings_require_administrator_capability(self):
         self.assertEqual(self.run_php('argon_update_themeoptions', "$_POST = array('update_themeoptions' => 'true', 'argon_update_themeoptions_nonce' => 'valid'); argon_update_themeoptions(); echo json_encode($writes);", 'settings.php'), [])

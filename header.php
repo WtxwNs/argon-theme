@@ -128,6 +128,7 @@
 	<script>
 		document.documentElement.classList.remove("no-js");
 		var argonConfig = {
+			comment_pin_nonce: <?php echo wp_json_encode(current_user_can('moderate_comments') ? wp_create_nonce('argon_pin_comment') : ''); ?>,
 			wp_path: "<?php echo $GLOBALS['wp_path']; ?>",
 			language: "<?php echo argon_get_locate(); ?>",
 			dateFormat: "<?php echo get_option('argon_dateformat', 'YMD'); ?>",

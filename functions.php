@@ -1625,6 +1625,7 @@ add_action('wp_ajax_user_edit_comment', 'user_edit_comment');
 add_action('wp_ajax_nopriv_user_edit_comment', 'user_edit_comment');
 //置顶评论
 function pin_comment(){
+	check_ajax_referer('argon_pin_comment', 'nonce');
 	header('Content-Type:application/json; charset=utf-8');
 	if (get_option("argon_enable_comment_pinning") == "false"){
 		exit(json_encode(array(
@@ -1666,7 +1667,6 @@ function pin_comment(){
 	)));
 }
 add_action('wp_ajax_pin_comment', 'pin_comment');
-add_action('wp_ajax_nopriv_pin_comment', 'pin_comment');
 //输出评论分页页码
 function get_argon_formatted_comment_paginate_links($maxPageNumbers, $extraClasses = ''){
 	$args = array(
