@@ -880,6 +880,10 @@ function can_visit_comment_edit_history($id){
 	if (!$comment || !user_can_view_comment($id)){
 		return false;
 	}
+	$post_id = $comment -> comment_post_ID;
+	if (!get_post($post_id) || post_password_required($post_id) || (get_post_status($post_id) != 'publish' && !current_user_can('read_post', $post_id))){
+		return false;
+	}
 	if ($comment -> comment_approved != '1' && !current_user_can('moderate_comments') && !check_comment_token($id) && !check_comment_userid($id)){
 		return false;
 	}

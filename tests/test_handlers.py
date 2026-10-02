@@ -32,7 +32,8 @@ function load_function($file, $name) {
 $writes = array();
 $capabilities = array();
 $meta = array();
-$comment = (object) array('comment_approved' => '1');
+$comment = (object) array('comment_approved' => '1', 'comment_post_ID' => 7);
+$post_exists = true; $post_status = 'publish'; $password_required = false;
 $visible = true; $owner = false; $history_access = 'everyone';
 function current_user_can($cap, $id = null) { global $capabilities; return in_array($cap . ($id === null ? '' : ':' . $id), $capabilities, true); }
 function wp_verify_nonce($nonce, $action) { return $nonce === 'valid'; }
@@ -44,6 +45,9 @@ function get_post_meta($id, $key, $single) { global $meta; return $meta[$key] ??
 function update_post_meta($id, $key, $value) { global $writes; $writes[] = array($id, $key, $value); return true; }
 function wp_kses_post($value) { return 'filtered:' . $value; }
 function wp_strip_all_tags($value) { return strip_tags($value); }
+function get_post($id) { global $post_exists; return $post_exists ? (object) array('ID' => $id) : null; }
+function get_post_status($id) { global $post_status; return $post_status; }
+function post_password_required($id) { global $password_required; return $password_required; }
 function get_comment($id) { global $comment; return $comment; }
 function user_can_view_comment($id) { global $visible; return $visible; }
 function check_comment_token($id) { global $owner; return $owner; }
@@ -90,11 +94,17 @@ class HandlerTests(unittest.TestCase):
         for setup, expected in cases:
             self.assertEqual(self.run_php('can_visit_comment_edit_history', setup + ' echo json_encode(can_visit_comment_edit_history(42));'), expected)
 
+    def test_history_obeys_parent_post_visibility(self):
+        for setup, expected in [('$post_exists = false;', False), ('$password_required = true;', False),
+                                ("$post_status = 'private';", False),
+                                ("$post_status = 'private'; $capabilities = array('read_post:7');", True)]:
+            self.assertEqual(self.run_php('can_visit_comment_edit_history', setup + ' echo json_encode(can_visit_comment_edit_history(42));'), expected)
+
     def test_save_uses_target_permission_for_any_post_type(self):
         result = self.run_php('argon_save_meta_data', "$_POST = array('argon_meta_box_nonce' => 'valid', 'post_type' => 'custom'); argon_save_meta_data(42); echo json_encode($writes);")
         self.assertEqual(result, [])
 
-    def test_save_respects_html_capability_and_preserves_slashes(self):
+    def test_save_respects_html_capability(self):
         data = dict(argon_meta_box_nonce='valid', post_type='post', argon_meta_hide_readingtime='false', argon_meta_simple='false', argon_first_image_as_thumbnail='default', argon_show_post_outdated_info='default', argon_after_post='<b>content</b>', argon_custom_css='p { color: red; }')
         for unrestricted in (False, True):
             caps = ['edit_post:42'] + (['unfiltered_html'] if unrestricted else [])
